@@ -1237,7 +1237,7 @@
             const predicted = `${cardName} → 約${Math.floor((meta.power||6) + state.player.atk * 0.5)}ダメージ`;
             sendOnlineEvent({ type: 'ATTACK_ANNOUNCE', actorId: myPlayerId, targetId: targetOnlineId,
               targetIndex, cardName, predicted });
-            showAnnounce(`⚔️ ${cardName}`, `カウンター待機中... (2.8s)`, 2800);
+            showAnnounce(`⚔️ ${cardName}`, `カウンター待機中... (5s)`, 5000);
             setTimeout(() => {
               const hpBefore = target.hp;
               const result = useCard(state.player, target, cardName);
@@ -1257,7 +1257,7 @@
                 targetId: state.enemies[targetIndex]?._onlineId || null,
                 result, playerState: serializeMyState(), allState: serializeAllState() });
               setTimeout(nextActor, 500);
-            }, 2800);
+            }, 5000);
           } else {
             // ローカル: 即時実行
             const hpBefore = target.hp;
@@ -1350,7 +1350,7 @@
                 ? `回復 ${Math.floor(meta.power + enemy.mag * 0.3)}`
                 : '';
 
-      showAnnounce(`${enemy.name}`, `${card} → ${predicted}`, 2800);
+      showAnnounce(`${enemy.name}`, `${card} → ${predicted}`, 5000);
       addLog(`${enemy.name} は ${card} を使おうとしている`);
       renderHand();
 
@@ -1749,7 +1749,36 @@
       document.getElementById('quitYes').onclick = () => { window.close(); setTimeout(()=>{ window.location.href='about:blank'; },200); };
       document.getElementById('quitNo').onclick  = () => overlay.remove();
     });
-    document.getElementById('titleBackBtn').addEventListener('click', () => {
+    document.getElementById('titleBackBtn').addEventListener('click', async () => {
+      // オンライン中なら完全切断・リセット
+      if (isOnlineMode) {
+        try { if (onlineChannel) await sbClient.removeChannel(onlineChannel); } catch(e) {}
+        onlineChannel = null;
+        isOnlineMode = false;
+        onlineRoom = null;
+        myPlayerId = null;
+        isRoomHost = false;
+        myOnlineIndex = 0;
+        onlineMemberOrder = [];
+        onlineBattleReadyMap = {};
+        onlineCounterPhase = false;
+        currentRoomId = null;
+        setRoomStatus('');
+        // ロビーUIリセット
+        const lobbyWait = document.getElementById('onlineLobbyWait');
+        if (lobbyWait) lobbyWait.style.display = 'none';
+        const lobbyEntry = document.getElementById('onlineLobbyEntry');
+        if (lobbyEntry) lobbyEntry.style.display = '';
+        const lobbyRoomId = document.getElementById('onlineLobbyRoomId');
+        if (lobbyRoomId) lobbyRoomId.textContent = '';
+        const lobbyList = document.getElementById('onlineLobby');
+        if (lobbyList) lobbyList.innerHTML = '';
+        const sb = document.getElementById('onlineStartBtn');
+        if (sb) sb.style.display = 'none';
+        const ri = document.getElementById('roomIdInput');
+        if (ri) ri.value = '';
+        document.getElementById('onlinePanel').classList.add('hidden');
+      }
       // BGM切替
       stopBGM();
       // アナウンスクリア
@@ -1829,7 +1858,7 @@
       const attackerIdx = onlineMemberOrder.findIndex(m => m.id === payload.actorId);
       const targetIdx   = onlineMemberOrder.findIndex(m => m.id === payload.targetId);
       const attackerName = onlineMemberOrder[attackerIdx]?.nickname || '相手';
-      showAnnounce(`${attackerName}`, `${payload.cardName} → ${payload.predicted}`, 2800);
+      showAnnounce(`${attackerName}`, `${payload.cardName} → ${payload.predicted}`, 5000);
       addLog(`${attackerName} は ${payload.cardName} を使おうとしている`);
 
       // 自分がターゲットならカウンターウィンドウを開く
@@ -1841,7 +1870,7 @@
         setTimeout(() => {
           onlineCounterPhase = false;
           updateOnlineTurnLock();
-        }, 2800);
+        }, 5000);
       }
     }
 
@@ -1891,6 +1920,17 @@
       SE.click && SE.click();
       const roomId = document.getElementById('roomIdInput').value.trim().toUpperCase();
       if (!roomId || roomId.length < 4) { setRoomStatus('ルームIDを入力してください', '#e74c3c'); return; }
+      // ルームの存在確認
+      setRoomStatus('確認中...', '#fdcb6e');
+      const testCh = sbClient.channel('room_' + roomId, { config: { presence: { key: 'test' } } });
+      await testCh.subscribe(async (status) => {});
+      await new Promise(r => setTimeout(r, 1500));
+      const members = Object.values(testCh.presenceState()).flat();
+      await sbClient.removeChannel(testCh);
+      if (members.length === 0) {
+        setRoomStatus('❌ そのルームIDは存在しないか、まだホストが待機していません', '#e74c3c');
+        return;
+      }
       myPlayerId = 'p_' + Math.random().toString(36).substring(2,8);
       isRoomHost = false;
       setRoomStatus('参加中...', '#fdcb6e');
@@ -2171,14 +2211,17 @@
       if (!isOnlineMode) return;
       if (state.phase === 'prepare') return; // 準備フェーズはロックなし
       const myTurn = isMyOnlineTurn();
+      const alive = state.player.alive;
       document.querySelectorAll('.hand-card').forEach(c => {
-        const cname = c.dataset.card;
+        const idx = parseInt(c.dataset.index);
+        const cname = state.player.hand[idx];
         const cmeta = CARD_META[cname] || {};
         let canUse = false;
-        if (myTurn) {
+        if (!alive) {
+          canUse = false;
+        } else if (myTurn) {
           canUse = true;
         } else if (onlineCounterPhase) {
-          // カウンターフェーズ: heal/shieldのみ使用可
           canUse = cmeta.type === 'heal' || cmeta.type === 'shield';
         }
         c.style.opacity       = canUse ? '1'       : '0.4';
