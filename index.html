@@ -314,7 +314,11 @@
           <div class="setup-panel">
             <div class="setup-row">
               <label class="setup-label">YOUR NAME</label>
-              <input class="setup-input" id="nicknameInput" type="text" maxlength="12" placeholder="ENTER NAME..." value="PLAYER" />
+              <div style="display:flex;gap:6px;align-items:center;">
+                <input class="setup-input" id="nicknameInput" type="text" maxlength="12" placeholder="ENTER NAME..." value="PLAYER" style="flex:1;" />
+                <button class="menu-btn" id="confirmNameBtn" style="padding:6px 12px;font-size:12px;white-space:nowrap;">確定</button>
+              </div>
+              <div id="confirmedNameDisplay" style="font-size:11px;color:#55efc4;margin-top:4px;min-height:16px;letter-spacing:.05em;"></div>
             </div>
             <div class="setup-row">
               <label class="setup-label">PLAYERS</label>
@@ -1139,6 +1143,8 @@
           if (playerPanel) showDamagePopup(playerPanel, result.match(/\d+/)?.[0] || '', meta.type);
           renderHand();
           renderTop();
+          if (isOnlineMode) sendOnlineEvent({ type: 'CARD_ACTION', actorId: myPlayerId,
+            cardName, targetId: null, result, playerState: serializeMyState(), allState: serializeAllState() });
           setTimeout(nextActor, 500);
         } else {
           showTargetSelector(index);
@@ -1189,6 +1195,8 @@
         shakeScreen();
         renderHand();
         renderTop();
+        if (isOnlineMode) sendOnlineEvent({ type: 'CARD_ACTION', actorId: myPlayerId,
+          cardName, targetId: 'aoe', result, playerState: serializeMyState(), allState: serializeAllState() });
         setTimeout(nextActor, 600);
         return;
       }
@@ -1233,6 +1241,8 @@
           document.querySelectorAll('.enemy-card').forEach(ec => ec.classList.remove('enemy-highlight'));
           renderHand();
           renderTop();
+          if (isOnlineMode) sendOnlineEvent({ type: 'CARD_ACTION', actorId: myPlayerId,
+            cardName, targetIndex, result, playerState: serializeMyState(), allState: serializeAllState() });
           setTimeout(nextActor, 500);
         };
       });
@@ -1669,6 +1679,17 @@
       rulePanel.classList.remove('hidden');
       statusBox.textContent = 'RULE を表示中。';
     });
+    // 名前確定ボタン
+    document.getElementById('confirmNameBtn').addEventListener('click', () => {
+      const name = document.getElementById('nicknameInput').value.trim() || 'PLAYER';
+      document.getElementById('nicknameInput').value = name;
+      document.getElementById('confirmedNameDisplay').textContent = '✅ ' + name + ' として参加します';
+      SE.click && SE.click();
+    });
+    document.getElementById('nicknameInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') document.getElementById('confirmNameBtn').click();
+    });
+
     document.getElementById('backBtn').addEventListener('click', () => {
       rulePanel.classList.add('hidden');
       mainMenu.classList.remove('hidden');
@@ -1907,6 +1928,63 @@
       launchOnlineGame(order);
     }
 
+
+    // 全体ステータス送信（手札枚数のみ）
+    function serializeAllState() {
+      return {
+        player: { hp: state.player.hp, maxHp: state.player.maxHp, shield: state.player.shield,
+                  atk: state.player.atk, def: state.player.def, mag: state.player.mag,
+                  alive: state.player.alive, handCount: state.player.hand.length },
+        enemies: state.enemies.map(e => ({
+          hp: e.hp, maxHp: e.maxHp, shield: e.shield,
+          atk: e.atk, def: e.def, mag: e.mag, alive: e.alive, handCount: e.hand.length
+        }))
+      };
+    }
+
+    // カードアクション受信
+    function applyOnlineCardAction(payload) {
+      const actorIdx = onlineMemberOrder.findIndex(m => m.id === payload.actorId);
+      if (actorIdx < 0) return;
+
+      // 送信者のステータスを反映
+      const ps = payload.playerState;
+      if (actorIdx === 0) {
+        Object.assign(state.player, ps);
+        // 手札は枚数だけ減らす（自分でない場合）
+        if (myOnlineIndex !== 0 && payload.cardName) {
+          state.player.hand = Array(Math.max(0, (state.player.hand.length || 0) - 1)).fill('???');
+        }
+      } else if (state.enemies[actorIdx - 1]) {
+        Object.assign(state.enemies[actorIdx - 1], ps);
+        if (myOnlineIndex !== actorIdx && payload.cardName) {
+          state.enemies[actorIdx - 1].hand = Array(Math.max(0, (state.enemies[actorIdx - 1].hand.length || 0) - 1)).fill('???');
+        }
+      }
+
+      // 全体ステータス反映（HP・shield等）
+      if (payload.allState) {
+        const as = payload.allState;
+        // 自分のHPは上書きしない（自分が正）
+        const applyTo = (src, tgt) => {
+          if (tgt) { tgt.hp = src.hp; tgt.maxHp = src.maxHp; tgt.shield = src.shield;
+                     tgt.alive = src.alive; tgt.atk = src.atk; tgt.def = src.def; tgt.mag = src.mag; }
+        };
+        // P0のステータス更新（自分がP0でなければ）
+        if (myOnlineIndex !== 0) applyTo(as.player, state.player);
+        // 各敵のステータス更新
+        as.enemies.forEach((es, i) => {
+          if (myOnlineIndex !== i + 1 && state.enemies[i]) applyTo(es, state.enemies[i]);
+        });
+      }
+
+      const actorName = onlineMemberOrder[actorIdx]?.nickname || '相手';
+      addLog(`[🌐 ${actorName}]: ${payload.cardName} → ${payload.result}`);
+      showActionAnim(CARD_META[payload.cardName]?.type || 'physical');
+      renderTop();
+      renderHand();
+    }
+
     function handleOnlineEvent(payload) {
       switch (payload.type) {
         case 'START':
@@ -2002,6 +2080,7 @@
 
     function updateOnlineTurnLock() {
       if (!isOnlineMode) return;
+      if (state.phase === 'prepare') return; // 準備フェーズはロックなし
       const myTurn = isMyOnlineTurn();
       document.querySelectorAll('.hand-card').forEach(c => {
         const cname = c.dataset.card;
