@@ -1920,17 +1920,6 @@
       SE.click && SE.click();
       const roomId = document.getElementById('roomIdInput').value.trim().toUpperCase();
       if (!roomId || roomId.length < 4) { setRoomStatus('ルームIDを入力してください', '#e74c3c'); return; }
-      // ルームの存在確認
-      setRoomStatus('確認中...', '#fdcb6e');
-      const testCh = sbClient.channel('room_' + roomId, { config: { presence: { key: 'test' } } });
-      await testCh.subscribe(async (status) => {});
-      await new Promise(r => setTimeout(r, 1500));
-      const members = Object.values(testCh.presenceState()).flat();
-      await sbClient.removeChannel(testCh);
-      if (members.length === 0) {
-        setRoomStatus('❌ そのルームIDは存在しないか、まだホストが待機していません', '#e74c3c');
-        return;
-      }
       myPlayerId = 'p_' + Math.random().toString(36).substring(2,8);
       isRoomHost = false;
       setRoomStatus('参加中...', '#fdcb6e');
