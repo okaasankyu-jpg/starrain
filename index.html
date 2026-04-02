@@ -1999,6 +1999,11 @@
 
     // カードアクション受信
     function applyOnlineCardAction(payload) {
+      console.log('[CARD_ACTION received]', JSON.stringify({
+        actorId: payload.actorId, targetId: payload.targetId,
+        targetIndex: payload.targetIndex, cardName: payload.cardName,
+        myPlayerId, allStatePlayer: payload.allState?.player, allStateEnemies: payload.allState?.enemies
+      }));
       const actorMember = onlineMemberOrder.find(m => m.id === payload.actorId);
       if (!actorMember) return;
       const isActorMe = payload.actorId === myPlayerId;
@@ -2036,6 +2041,7 @@
           }
         });
         // 自分がターゲットなら_onlineIdで自分のデータを探してHP更新
+        console.log('[HP check] targetId:', payload.targetId, 'myPlayerId:', myPlayerId, 'as.player._onlineId:', as.player?._onlineId);
         if (payload.targetId === myPlayerId || payload.targetId === 'aoe') {
           let src = null;
           if (as.player?._onlineId === myPlayerId) {
