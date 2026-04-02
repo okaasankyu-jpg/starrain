@@ -1227,12 +1227,6 @@
     }
 
     function nextActor() {
-      // オンライン: 自分のターン終了をbroadcast
-      if (isOnlineMode && state.phase === 'battle') {
-        if (typeof getOnlineActorId === 'function' && getOnlineActorId() === myPlayerId) {
-          broadcastTurnEnd();
-        }
-      }
       if (state.battleResolved) {
         finishBattle();
         return;
@@ -1906,6 +1900,9 @@
         case 'BATTLE_PHASE':
           applyOnlineBattlePhase();
           break;
+        case 'BATTLE_READY':
+          applyBattleReady(payload);
+          break;
         case 'GAME_STATE_SYNC':
           applyFullStateSync(payload.state);
           break;
@@ -2033,12 +2030,12 @@
     function serializeMyState() {
       if (myOnlineIndex === 0) {
         return { hp: state.player.hp, maxHp: state.player.maxHp,
-                 shield: state.player.shield,
+                 hand: state.player.hand, shield: state.player.shield,
                  atk: state.player.atk, def: state.player.def, mag: state.player.mag,
                  alive: state.player.alive, lv: state.player.lv };
       } else {
         const e = state.enemies[myOnlineIndex - 1];
-        return e ? { hp: e.hp, maxHp: e.maxHp, shield: e.shield,
+        return e ? { hp: e.hp, maxHp: e.maxHp, hand: e.hand, shield: e.shield,
                      atk: e.atk, def: e.def, mag: e.mag, alive: e.alive, lv: e.lv } : {};
       }
     }
@@ -2062,13 +2059,80 @@
     // バトルフェーズ開始をbroadcast
     const _origStartBattle = startBattle;
     function startBattleOnline() {
-      if (isOnlineMode && isRoomHost) {
-        sendOnlineEvent({ type: 'BATTLE_PHASE' });
+      if (isOnlineMode) {
+        // 準備完了データを送信（手札・ステータス全部）
+        const myState = serializeReadyState();
+        sendOnlineEvent({ type: 'BATTLE_READY', actorId: myPlayerId, readyState: myState });
+        // 自分のreadyを記録
+        onlineBattleReadyMap[myPlayerId] = myState;
+        // 全員揃ったか確認
+        checkAllBattleReady();
+        // まだ開始しない（全員揃ってから）
+        showAnnounce('⏳ 他のプレイヤーを待っています...', 'START BATTLEを待機中', 0);
+        return; // _origStartBattle は全員揃ってから呼ぶ
       }
       _origStartBattle();
     }
 
     function applyOnlineBattlePhase() {
+      _origStartBattle();
+    }
+
+    // 準備完了データ（手札含む）
+    function serializeReadyState() {
+      if (myOnlineIndex === 0) {
+        return {
+          hp: state.player.hp, maxHp: state.player.maxHp,
+          atk: state.player.atk, def: state.player.def, mag: state.player.mag,
+          lv: state.player.lv, hand: [...state.player.hand],
+          shield: 0, atkBuff: 0, magBuff: 0, alive: true
+        };
+      } else {
+        const e = state.enemies[myOnlineIndex - 1];
+        return e ? {
+          hp: e.hp, maxHp: e.maxHp,
+          atk: e.atk, def: e.def, mag: e.mag,
+          lv: e.lv, hand: [...e.hand],
+          shield: 0, atkBuff: 0, magBuff: 0, alive: true
+        } : {};
+      }
+    }
+
+    // BATTLE_READY受信処理
+    let onlineBattleReadyMap = {};
+
+    function applyBattleReady(payload) {
+      onlineBattleReadyMap[payload.actorId] = payload.readyState;
+      const readyCount = Object.keys(onlineBattleReadyMap).length;
+      const total = onlineMemberOrder.length;
+      showAnnounce(`⏳ バトル準備中...`, `${readyCount} / ${total} 人が準備完了`, 0);
+      checkAllBattleReady();
+    }
+
+    function checkAllBattleReady() {
+      const total = onlineMemberOrder.length;
+      if (Object.keys(onlineBattleReadyMap).length < total) return;
+
+      // 全員のステータス・手札を適用
+      onlineMemberOrder.forEach((member, i) => {
+        const rs = onlineBattleReadyMap[member.id];
+        if (!rs) return;
+        if (i === 0) {
+          Object.assign(state.player, rs);
+          if (myOnlineIndex === 0) state.player.hand = rs.hand; // 自分の手札はそのまま
+        } else if (state.enemies[i - 1]) {
+          Object.assign(state.enemies[i - 1], rs);
+          // 他プレイヤーの手札は枚数だけ管理（中身は非公開）
+          if (myOnlineIndex !== i) {
+            state.enemies[i - 1].hand = Array(rs.hand.length).fill('???');
+          } else {
+            state.enemies[i - 1].hand = rs.hand;
+          }
+        }
+      });
+
+      onlineBattleReadyMap = {}; // リセット
+      clearAnnounce();
       _origStartBattle();
     }
 
@@ -2090,7 +2154,7 @@
     }
 
     // 関数の差し替え（グローバル上書き）
-    // window.nextActor = nextActorOnline; // disabled: broadcast now inline
+    window.nextActor   = nextActorOnline;
     window.startBattle = startBattleOnline;
     window.enemyAct    = enemyActOnline;
     window.renderHand  = renderHandOnline;
