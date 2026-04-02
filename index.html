@@ -2044,19 +2044,15 @@
             src = as.enemies.find(e => e._onlineId === myPlayerId);
           }
           if (src) {
-            console.log('[HP APPLY] before:', state.player.hp, '→ after:', src.hp);
             state.player.hp = src.hp; state.player.maxHp = src.maxHp;
             state.player.shield = src.shield; state.player.alive = src.alive;
-            console.log('[HP APPLY] state.player.hp is now:', state.player.hp);
           } else {
-            console.log('[HP APPLY] src not found! as.enemies:', JSON.stringify(as.enemies), 'myPlayerId:', myPlayerId);
           }
         }
       }
 
       addLog(`[🌐 ${actorMember.nickname}]: ${payload.cardName} → ${payload.result}`);
       showActionAnim(CARD_META[payload.cardName]?.type || 'physical');
-      console.log('[PRE-RENDER] state.player.hp:', state.player.hp);
       renderTop();
       renderHand();
     }
