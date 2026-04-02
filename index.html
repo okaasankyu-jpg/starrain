@@ -1999,42 +1999,48 @@
 
     // カードアクション受信
     function applyOnlineCardAction(payload) {
-      const actorIdx = onlineMemberOrder.findIndex(m => m.id === payload.actorId);
-      if (actorIdx < 0) return;
+      const actorMember = onlineMemberOrder.find(m => m.id === payload.actorId);
+      if (!actorMember) return;
+      const isActorMe = payload.actorId === myPlayerId;
+      if (isActorMe) return; // 自分のアクションは自分で処理済み
 
-      // 送信者のステータスを反映
+      // 送信者のステータスを反映（_onlineIdで照合）
       const ps = payload.playerState;
-      if (actorIdx === 0) {
+      const actorEnemy = state.enemies.find(e => e._onlineId === payload.actorId);
+      if (actorEnemy) {
+        const prevHandLen = actorEnemy.hand.length;
+        Object.assign(actorEnemy, ps);
+        // 手札は枚数だけ（カード使用で1枚減）
+        actorEnemy.hand = Array(Math.max(0, prevHandLen - 1)).fill('???');
+      } else if (state.player._onlineId === payload.actorId) {
+        // state.playerが攻撃者（通常はないが念のため）
         Object.assign(state.player, ps);
-        // 手札は枚数だけ減らす（自分でない場合）
-        if (myOnlineIndex !== 0 && payload.cardName) {
-          state.player.hand = Array(Math.max(0, (state.player.hand.length || 0) - 1)).fill('???');
-        }
-      } else if (state.enemies[actorIdx - 1]) {
-        Object.assign(state.enemies[actorIdx - 1], ps);
-        if (myOnlineIndex !== actorIdx && payload.cardName) {
-          state.enemies[actorIdx - 1].hand = Array(Math.max(0, (state.enemies[actorIdx - 1].hand.length || 0) - 1)).fill('???');
-        }
       }
 
-      // 全体ステータス反映（HP・shield等）
+      // ターゲットのHPをallStateから反映
       if (payload.allState) {
         const as = payload.allState;
-        // 自分のHPは上書きしない（自分が正）
-        const applyTo = (src, tgt) => {
-          if (tgt) { tgt.hp = src.hp; tgt.maxHp = src.maxHp; tgt.shield = src.shield;
-                     tgt.alive = src.alive; tgt.atk = src.atk; tgt.def = src.def; tgt.mag = src.mag; }
-        };
-        // P0のステータス更新（自分がP0でなければ）
-        if (myOnlineIndex !== 0) applyTo(as.player, state.player);
-        // 各敵のステータス更新
-        as.enemies.forEach((es, i) => {
-          if (myOnlineIndex !== i + 1 && state.enemies[i]) applyTo(es, state.enemies[i]);
+        onlineMemberOrder.forEach((m) => {
+          if (m.id === myPlayerId) return; // 自分は自分で管理
+          const enemy = state.enemies.find(e => e._onlineId === m.id);
+          if (enemy) {
+            const src = as.enemies[onlineMemberOrder.indexOf(m) - 1] || as.player;
+            if (src) { enemy.hp = src.hp; enemy.maxHp = src.maxHp;
+                       enemy.shield = src.shield; enemy.alive = src.alive; }
+          }
         });
+        // 自分がターゲットならHPを更新
+        if (payload.targetIndex !== undefined && payload.targetIndex !== null) {
+          const myEnemySlot = myOnlineIndex - 1;
+          if (payload.targetIndex === myEnemySlot || payload.targetId === 'aoe') {
+            const src = as.enemies[myEnemySlot];
+            if (src) { state.player.hp = src.hp; state.player.maxHp = src.maxHp;
+                       state.player.shield = src.shield; state.player.alive = src.alive; }
+          }
+        }
       }
 
-      const actorName = onlineMemberOrder[actorIdx]?.nickname || '相手';
-      addLog(`[🌐 ${actorName}]: ${payload.cardName} → ${payload.result}`);
+      addLog(`[🌐 ${actorMember.nickname}]: ${payload.cardName} → ${payload.result}`);
       showActionAnim(CARD_META[payload.cardName]?.type || 'physical');
       renderTop();
       renderHand();
@@ -2095,24 +2101,41 @@
       selectedPlayerCount = order.length;
       resetState(); // state.player / state.enemies を生成
 
-      // 全メンバーの名前を設定
+      // 全メンバーの名前・IDを設定（全員共通の順番で）
       order.forEach((m, i) => {
         if (i === 0) {
           state.player.name = m.nickname;
           state.player._onlineId = m.id;
         } else {
           if (state.enemies[i-1]) {
-            state.enemies[i-1].name   = m.nickname;
+            state.enemies[i-1].name      = m.nickname;
             state.enemies[i-1]._onlineId = m.id;
             state.enemies[i-1]._isOnline = true;
           }
         }
       });
 
-      document.querySelector('.player-name').textContent = order[0].nickname;
+      // 非ホスト: state.playerと自分のenemyスロットを入れ替える
+      // → 常にstate.player=自分、state.enemies=相手になる
+      if (myOnlineIndex > 0) {
+        const myEnemy = state.enemies[myOnlineIndex - 1];
+        // deep copyで入れ替え（配列の参照共有を防ぐ）
+        const myData   = JSON.parse(JSON.stringify(myEnemy));
+        const hostData = JSON.parse(JSON.stringify(state.player));
+        Object.assign(state.player, myData);
+        Object.assign(state.enemies[myOnlineIndex - 1], hostData);
+        // _onlineIdを再設定
+        state.player._onlineId = myPlayerId;
+        state.player.name = order[myOnlineIndex].nickname;
+        state.enemies[myOnlineIndex - 1]._onlineId = order[0].id;
+        state.enemies[myOnlineIndex - 1]._isOnline = true;
+        state.enemies[myOnlineIndex - 1].name = order[0].nickname;
+      }
+
+      document.querySelector('.player-name').textContent = state.player.name || order[myOnlineIndex]?.nickname;
       renderEnemyArea();
       startBGM('prepare');
-      addLog(`🌐 オンライン対戦開始！ ${order.length}人`);
+      addLog(`🌐 オンライン対戦開始！ ${order.length}人 / あなた: ${order[myOnlineIndex]?.nickname}`);
       renderTop();
       renderHand();
       updateOnlineTurnLock();
@@ -2277,20 +2300,23 @@
       const total = onlineMemberOrder.length;
       if (Object.keys(onlineBattleReadyMap).length < total) return;
 
-      // 全員のステータス・手札を適用
-      onlineMemberOrder.forEach((member, i) => {
+      // 全員のステータス・手札を適用（_onlineIdで照合）
+      // state.player = 自分, state.enemies = 相手（swap済み）
+      onlineMemberOrder.forEach((member) => {
         const rs = onlineBattleReadyMap[member.id];
         if (!rs) return;
-        if (i === 0) {
+        const isMe = (member.id === myPlayerId);
+        if (isMe) {
+          // 自分のデータ → state.player（手札はそのまま使う）
+          const myHand = state.player.hand; // 自分の手札を保持
           Object.assign(state.player, rs);
-          if (myOnlineIndex === 0) state.player.hand = rs.hand; // 自分の手札はそのまま
-        } else if (state.enemies[i - 1]) {
-          Object.assign(state.enemies[i - 1], rs);
-          // 他プレイヤーの手札は枚数だけ管理（中身は非公開）
-          if (myOnlineIndex !== i) {
-            state.enemies[i - 1].hand = Array(rs.hand.length).fill('???');
-          } else {
-            state.enemies[i - 1].hand = rs.hand;
+          state.player.hand = myHand;
+        } else {
+          // 相手のデータ → _onlineIdで対応するenemyを探す
+          const enemy = state.enemies.find(e => e._onlineId === member.id);
+          if (enemy) {
+            Object.assign(enemy, rs);
+            enemy.hand = Array(rs.hand.length).fill('???'); // 手札は枚数だけ
           }
         }
       });
