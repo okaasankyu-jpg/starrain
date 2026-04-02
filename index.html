@@ -1999,11 +1999,6 @@
 
     // カードアクション受信
     function applyOnlineCardAction(payload) {
-      console.log('[CARD_ACTION received]', JSON.stringify({
-        actorId: payload.actorId, targetId: payload.targetId,
-        targetIndex: payload.targetIndex, cardName: payload.cardName,
-        myPlayerId, allStatePlayer: payload.allState?.player, allStateEnemies: payload.allState?.enemies
-      }));
       const actorMember = onlineMemberOrder.find(m => m.id === payload.actorId);
       if (!actorMember) return;
       const isActorMe = payload.actorId === myPlayerId;
@@ -2041,7 +2036,6 @@
           }
         });
         // 自分がターゲットなら_onlineIdで自分のデータを探してHP更新
-        console.log('[HP check] targetId:', payload.targetId, 'myPlayerId:', myPlayerId, 'as.player._onlineId:', as.player?._onlineId);
         if (payload.targetId === myPlayerId || payload.targetId === 'aoe') {
           let src = null;
           if (as.player?._onlineId === myPlayerId) {
@@ -2050,14 +2044,19 @@
             src = as.enemies.find(e => e._onlineId === myPlayerId);
           }
           if (src) {
+            console.log('[HP APPLY] before:', state.player.hp, '→ after:', src.hp);
             state.player.hp = src.hp; state.player.maxHp = src.maxHp;
             state.player.shield = src.shield; state.player.alive = src.alive;
+            console.log('[HP APPLY] state.player.hp is now:', state.player.hp);
+          } else {
+            console.log('[HP APPLY] src not found! as.enemies:', JSON.stringify(as.enemies), 'myPlayerId:', myPlayerId);
           }
         }
       }
 
       addLog(`[🌐 ${actorMember.nickname}]: ${payload.cardName} → ${payload.result}`);
       showActionAnim(CARD_META[payload.cardName]?.type || 'physical');
+      console.log('[PRE-RENDER] state.player.hp:', state.player.hp);
       renderTop();
       renderHand();
     }
