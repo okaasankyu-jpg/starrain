@@ -1233,7 +1233,7 @@
 
           // オンライン時: 攻撃予告→カウンター待機→実行
           if (isOnlineMode) {
-            const targetOnlineId = onlineMemberOrder[targetIndex + 1]?.id || null;
+            const targetOnlineId = state.enemies[targetIndex]?._onlineId || onlineMemberOrder[targetIndex + 1]?.id || null;
             const predicted = `${cardName} → 約${Math.floor((meta.power||6) + state.player.atk * 0.5)}ダメージ`;
             sendOnlineEvent({ type: 'ATTACK_ANNOUNCE', actorId: myPlayerId, targetId: targetOnlineId,
               targetIndex, cardName, predicted });
@@ -1253,7 +1253,9 @@
               }
               renderHand(); renderTop();
               sendOnlineEvent({ type: 'CARD_ACTION', actorId: myPlayerId,
-                cardName, targetIndex, result, playerState: serializeMyState(), allState: serializeAllState() });
+                cardName, targetIndex,
+                targetId: state.enemies[targetIndex]?._onlineId || null,
+                result, playerState: serializeMyState(), allState: serializeAllState() });
               setTimeout(nextActor, 500);
             }, 2800);
           } else {
