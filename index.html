@@ -1223,27 +1223,53 @@
           const target = state.enemies[targetIndex];
           SE.targetOpen && SE.targetOpen();
           showActionAnim(CARD_META[cardName]?.type || 'physical');
-          const hpBefore = target.hp;
-          const result = useCard(state.player, target, cardName);
-          const dmgDealt = Math.max(0, hpBefore - target.hp);
-          playSEForCard(CARD_META[cardName]?.type || 'physical');
-          state.player.hand.splice(cardIndex, 1);
-          addLog(`PLAYER → ${target.name}: ${result}`);
-          // エフェクト発火
           const meta = CARD_META[cardName] || {};
-          const targetEl = document.getElementById('enemyCard' + targetIndex);
-          if (targetEl) {
-            if (dmgDealt > 0) { showDamagePopup(targetEl, dmgDealt, meta.type); hitEnemyCard(targetIndex); shakeScreen(); }
-            else if (meta.type === 'debuff') showDamagePopup(targetEl, result.match(/\d+/)?.[0] || '', 'debuff');
-          }
-          clearAnnounce();
           targetSelector.classList.add('hidden');
           document.querySelectorAll('.enemy-card').forEach(ec => ec.classList.remove('enemy-highlight'));
-          renderHand();
-          renderTop();
-          if (isOnlineMode) sendOnlineEvent({ type: 'CARD_ACTION', actorId: myPlayerId,
-            cardName, targetIndex, result, playerState: serializeMyState(), allState: serializeAllState() });
-          setTimeout(nextActor, 500);
+
+          // オンライン時: 攻撃予告→カウンター待機→実行
+          if (isOnlineMode) {
+            const targetOnlineId = onlineMemberOrder[targetIndex + 1]?.id || null;
+            const predicted = `${cardName} → 約${Math.floor((meta.power||6) + state.player.atk * 0.5)}ダメージ`;
+            sendOnlineEvent({ type: 'ATTACK_ANNOUNCE', actorId: myPlayerId, targetId: targetOnlineId,
+              targetIndex, cardName, predicted });
+            showAnnounce(`⚔️ ${cardName}`, `カウンター待機中... (2.8s)`, 2800);
+            setTimeout(() => {
+              const hpBefore = target.hp;
+              const result = useCard(state.player, target, cardName);
+              const dmgDealt = Math.max(0, hpBefore - target.hp);
+              playSEForCard(meta.type || 'physical');
+              showActionAnim(meta.type || 'physical');
+              state.player.hand.splice(cardIndex, 1);
+              addLog(`PLAYER → ${target.name}: ${result}`);
+              const targetEl = document.getElementById('enemyCard' + targetIndex);
+              if (targetEl) {
+                if (dmgDealt > 0) { showDamagePopup(targetEl, dmgDealt, meta.type); hitEnemyCard(targetIndex); shakeScreen(); }
+                else if (meta.type === 'debuff') showDamagePopup(targetEl, result.match(/\d+/)?.[0]||'', 'debuff');
+              }
+              renderHand(); renderTop();
+              sendOnlineEvent({ type: 'CARD_ACTION', actorId: myPlayerId,
+                cardName, targetIndex, result, playerState: serializeMyState(), allState: serializeAllState() });
+              setTimeout(nextActor, 500);
+            }, 2800);
+          } else {
+            // ローカル: 即時実行
+            const hpBefore = target.hp;
+            const result = useCard(state.player, target, cardName);
+            const dmgDealt = Math.max(0, hpBefore - target.hp);
+            playSEForCard(meta.type || 'physical');
+            showActionAnim(meta.type || 'physical');
+            state.player.hand.splice(cardIndex, 1);
+            addLog(`PLAYER → ${target.name}: ${result}`);
+            const targetEl = document.getElementById('enemyCard' + targetIndex);
+            if (targetEl) {
+              if (dmgDealt > 0) { showDamagePopup(targetEl, dmgDealt, meta.type); hitEnemyCard(targetIndex); shakeScreen(); }
+              else if (meta.type === 'debuff') showDamagePopup(targetEl, result.match(/\d+/)?.[0]||'', 'debuff');
+            }
+            clearAnnounce();
+            renderHand(); renderTop();
+            setTimeout(nextActor, 500);
+          }
         };
       });
     }
@@ -1275,6 +1301,11 @@
       );
 
       state.currentActor = nextActor;
+
+      // オンライン: 次のアクターをbroadcast（自分のターンが終わった直後のみ）
+      if (isOnlineMode && state.phase === 'battle') {
+        broadcastTurnEnd();
+      }
 
       if (state.currentActor === 0) {
         SE.yourTurn(); showAnnounce('🎴 YOUR TURN', '', 1200);
@@ -2142,18 +2173,27 @@
 
     function applyOnlineTurnEnd(payload) {
       onlineCounterPhase = false;
-      // 送信者のstateを反映
       const idx = onlineMemberOrder.findIndex(m => m.id === payload.actorId);
       if (idx === 0) {
-        Object.assign(state.player, payload.playerState);
+        if (myOnlineIndex !== 0) Object.assign(state.player, payload.playerState);
       } else if (idx > 0 && state.enemies[idx-1]) {
-        Object.assign(state.enemies[idx-1], payload.playerState);
+        if (myOnlineIndex !== idx) Object.assign(state.enemies[idx-1], payload.playerState);
       }
       state.currentActor = payload.currentActor;
+      addLog(`[🌐 ${onlineMemberOrder[idx]?.nickname || '?'}] ターン終了 → 次: P${payload.currentActor + 1}`);
+
+      // 自分のターンなら通知
+      if (state.currentActor === myOnlineIndex) {
+        SE.yourTurn && SE.yourTurn();
+        showAnnounce('🎴 YOUR TURN', '', 1200);
+        addLog('あなたのターン！');
+      } else {
+        const nextName = onlineMemberOrder[state.currentActor]?.nickname || '相手';
+        showAnnounce(`⏳ ${nextName}のターン`, '', 0);
+      }
       renderTop();
       renderHand();
       updateOnlineTurnLock();
-      addLog(`[🌐 ${onlineMemberOrder[idx]?.nickname}] ターン終了`);
     }
 
     // バトルフェーズ開始をbroadcast
