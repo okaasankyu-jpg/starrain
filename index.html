@@ -339,27 +339,15 @@
         <div class="rule-panel hidden" id="onlinePanel">
           <div class="rule-scroll" style="text-align:center;">
             <h2 style="margin-bottom:16px;color:#3a7bd5;letter-spacing:.1em;">🌐 MULTIPLAYER LOBBY</h2>
-
-            <!-- Entry: create/join -->
-            <div id="onlineLobbyEntry">
-              <div style="display:grid;gap:10px;margin-bottom:12px;">
-                <button class="menu-btn" id="createRoomBtn" style="background:linear-gradient(180deg,#1a5c2a,#0d3a1a);border-color:#3aaa5a;color:#a8ffb8;">🏠 ルーム作成</button>
-                <div style="display:flex;gap:8px;">
-                  <input id="roomIdInput" maxlength="8" placeholder="ルームID入力"
-                    style="flex:1;padding:10px;background:#111;border:2px solid #555;color:#f6f0cf;font-size:1rem;text-transform:uppercase;font-family:Inter,sans-serif;" />
-                  <button class="menu-btn" id="joinRoomBtn" style="background:linear-gradient(180deg,#1a2c6a,#0d1a44);border-color:#3a5bd5;color:#a8b8ff;">参加</button>
-                </div>
+            <div style="display:grid;gap:10px;margin-bottom:12px;">
+              <button class="menu-btn" id="createRoomBtn" style="background:linear-gradient(180deg,#1a5c2a,#0d3a1a);border-color:#3aaa5a;color:#a8ffb8;">🏠 ルーム作成</button>
+              <div style="display:flex;gap:8px;">
+                <input id="roomIdInput" maxlength="8" placeholder="ルームID入力"
+                  style="flex:1;padding:10px;background:#111;border:2px solid #555;color:#f6f0cf;font-size:1rem;text-transform:uppercase;font-family:Inter,sans-serif;" />
+                <button class="menu-btn" id="joinRoomBtn" style="background:linear-gradient(180deg,#1a2c6a,#0d1a44);border-color:#3a5bd5;color:#a8b8ff;">参加</button>
               </div>
             </div>
-
-            <!-- Wait: lobby after joining -->
-            <div id="onlineLobbyWait" style="display:none;">
-              <div style="margin-bottom:8px;font-size:.85rem;color:#aaa;">ルームID</div>
-              <div id="onlineLobbyRoomId" style="font-size:1.6rem;font-weight:700;color:#55efc4;letter-spacing:.2em;margin-bottom:16px;"></div>
-              <div id="onlineLobby" style="font-size:.9rem;color:#f6f0cf;line-height:2;min-height:40px;"></div>
-            </div>
-
-            <div id="roomStatus" style="font-size:.85rem;color:#a89460;min-height:20px;margin:10px 0;"></div>
+            <div id="roomStatus" style="font-size:.85rem;color:#a89460;min-height:20px;margin-bottom:8px;"></div>
             <button class="menu-btn" id="onlineBackBtn" style="margin-top:8px;width:100%;">← タイトルに戻る</button>
           </div>
         </div>
@@ -1239,6 +1227,12 @@
     }
 
     function nextActor() {
+      // オンライン: 自分のターン終了をbroadcast
+      if (isOnlineMode && state.phase === 'battle') {
+        if (typeof getOnlineActorId === 'function' && getOnlineActorId() === myPlayerId) {
+          broadcastTurnEnd();
+        }
+      }
       if (state.battleResolved) {
         finishBattle();
         return;
@@ -1821,11 +1815,7 @@
       document.getElementById('roomIdInput').value = roomId;
       setRoomStatus('ルーム作成中...', '#fdcb6e');
       await joinOnlineRoom(roomId);
-      // Hide entry form, show lobby
-      document.getElementById('onlineLobbyEntry').style.display = 'none';
-      document.getElementById('onlineLobbyWait').style.display = 'block';
-      document.getElementById('onlineLobbyRoomId').textContent = roomId;
-      setRoomStatus('友達にルームIDを教えてください！', '#55efc4');
+      setRoomStatus(`ルームID: ${roomId}  ← 友達に共有してください`, '#55efc4');
     });
 
     document.getElementById('joinRoomBtn').addEventListener('click', async () => {
@@ -1836,11 +1826,6 @@
       isRoomHost = false;
       setRoomStatus('参加中...', '#fdcb6e');
       await joinOnlineRoom(roomId);
-      // Hide entry form, show lobby
-      document.getElementById('onlineLobbyEntry').style.display = 'none';
-      document.getElementById('onlineLobbyWait').style.display = 'block';
-      document.getElementById('onlineLobbyRoomId').textContent = roomId;
-      setRoomStatus('ホストがゲームを開始するまでお待ちください', '#55efc4');
     });
 
     async function joinOnlineRoom(roomId) {
@@ -2048,12 +2033,12 @@
     function serializeMyState() {
       if (myOnlineIndex === 0) {
         return { hp: state.player.hp, maxHp: state.player.maxHp,
-                 hand: state.player.hand, shield: state.player.shield,
+                 shield: state.player.shield,
                  atk: state.player.atk, def: state.player.def, mag: state.player.mag,
                  alive: state.player.alive, lv: state.player.lv };
       } else {
         const e = state.enemies[myOnlineIndex - 1];
-        return e ? { hp: e.hp, maxHp: e.maxHp, hand: e.hand, shield: e.shield,
+        return e ? { hp: e.hp, maxHp: e.maxHp, shield: e.shield,
                      atk: e.atk, def: e.def, mag: e.mag, alive: e.alive, lv: e.lv } : {};
       }
     }
@@ -2105,7 +2090,7 @@
     }
 
     // 関数の差し替え（グローバル上書き）
-    window.nextActor   = nextActorOnline;
+    // window.nextActor = nextActorOnline; // disabled: broadcast now inline
     window.startBattle = startBattleOnline;
     window.enemyAct    = enemyActOnline;
     window.renderHand  = renderHandOnline;
