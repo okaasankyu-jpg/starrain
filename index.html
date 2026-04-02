@@ -361,6 +361,7 @@
               <div style="font-size:.8rem;color:#aaa;margin-bottom:6px;">ルームID</div>
               <div id="onlineLobbyRoomId" style="font-size:1.8rem;font-weight:700;color:#55efc4;letter-spacing:.25em;margin-bottom:16px;"></div>
               <div id="onlineLobby" style="font-size:.9rem;color:#f6f0cf;line-height:2;min-height:40px;text-align:left;"></div>
+              <button id="onlineStartBtn" class="menu-btn" style="display:none;margin-top:12px;background:linear-gradient(180deg,#4a1a6a,#2a0a4a);border-color:#9b59b6;color:#d7bde2;width:100%;padding:14px;font-size:1rem;">🎮 オンライン対戦スタート</button>
             </div>
 
             <div id="roomStatus" style="font-size:.85rem;color:#a89460;min-height:20px;margin:10px 0;"></div>
@@ -1957,20 +1958,15 @@
 
       setRoomStatus(`参加者: ${members.length}人`, '#55efc4');
 
-      // ホスト & 2人以上でスタートボタン
-      let sb = document.getElementById('onlineStartBtn');
-      if (isRoomHost && members.length >= 2) {
-        if (!sb) {
-          sb = document.createElement('button');
-          sb.id = 'onlineStartBtn';
-          sb.className = 'menu-btn';
-          sb.style.cssText = 'margin-top:12px;background:linear-gradient(180deg,#4a1a6a,#2a0a4a);border-color:#9b59b6;color:#d7bde2;width:100%;padding:14px;font-size:1rem;';
-          sb.textContent = '🎮 オンライン対戦スタート';
+      // ホスト & 2人以上でスタートボタン表示
+      const sb = document.getElementById('onlineStartBtn');
+      if (sb) {
+        if (isRoomHost && members.length >= 2) {
+          sb.style.display = 'block';
           sb.onclick = hostStartOnlineGame;
-          el.after(sb);
+        } else {
+          sb.style.display = 'none';
         }
-      } else if (sb && (!isRoomHost || members.length < 2)) {
-        sb.remove();
       }
     }
 
