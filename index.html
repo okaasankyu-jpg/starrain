@@ -1784,6 +1784,7 @@
 
     // ===== ONLINE MULTIPLAYER (完全版) =====
     let onlineRoom    = null;
+    let currentRoomId = null;
     let onlineChannel = null;
     let myPlayerId    = null;
     let isRoomHost    = false;
@@ -1897,6 +1898,7 @@
 
     async function joinOnlineRoom(roomId) {
       onlineRoom = roomId;
+      currentRoomId = roomId;
       const nickname = document.getElementById('nicknameInput')?.value.trim() || 'PLAYER';
       if (onlineChannel) await sbClient.removeChannel(onlineChannel);
 
@@ -1924,16 +1926,33 @@
     }
 
     function renderOnlineLobby(members) {
+      // onlineLobbyWait を確実に表示
+      const waitDiv = document.getElementById('onlineLobbyWait');
+      const entryDiv = document.getElementById('onlineLobbyEntry');
+      if (waitDiv) waitDiv.style.display = 'block';
+      if (entryDiv) entryDiv.style.display = 'none';
+
+      // ルームIDを表示
+      if (currentRoomId) {
+        const ridEl = document.getElementById('onlineLobbyRoomId');
+        if (ridEl) ridEl.textContent = currentRoomId;
+      }
+
+      // プレイヤーリスト更新
       let el = document.getElementById('onlineLobby');
       if (!el) {
         el = document.createElement('div');
         el.id = 'onlineLobby';
-        el.style.cssText = 'margin-top:8px;font-size:11px;color:#f6f0cf;line-height:1.8;';
-        document.getElementById('roomStatus').after(el);
+        el.style.cssText = 'margin-top:8px;font-size:.9rem;color:#f6f0cf;line-height:2;text-align:left;';
+        const ws = document.getElementById('onlineLobbyWait');
+        if (ws) ws.appendChild(el);
+        else document.getElementById('roomStatus').after(el);
       }
       el.innerHTML = members.map(m =>
-        `<div>👤 ${m.nickname}${m.playerId === myPlayerId ? ' <span style="color:#55efc4">(あなた)</span>' : ''}</div>`
+        `<div>👤 ${m.nickname}${m.playerId === myPlayerId ? ' <span style="color:#55efc4">（あなた）</span>' : ''}</div>`
       ).join('');
+
+      setRoomStatus(`参加者: ${members.length}人`, '#55efc4');
 
       // ホスト & 2人以上でスタートボタン
       let sb = document.getElementById('onlineStartBtn');
@@ -1942,12 +1961,14 @@
           sb = document.createElement('button');
           sb.id = 'onlineStartBtn';
           sb.className = 'menu-btn';
-          sb.style.cssText = 'margin-top:10px;background:linear-gradient(180deg,#4a1a6a,#2a0a4a);border-color:#9b59b6;color:#d7bde2;width:100%;';
+          sb.style.cssText = 'margin-top:12px;background:linear-gradient(180deg,#4a1a6a,#2a0a4a);border-color:#9b59b6;color:#d7bde2;width:100%;padding:14px;font-size:1rem;';
           sb.textContent = '🎮 オンライン対戦スタート';
           sb.onclick = hostStartOnlineGame;
           el.after(sb);
         }
-      } else if (sb) sb.remove();
+      } else if (sb && (!isRoomHost || members.length < 2)) {
+        sb.remove();
+      }
     }
 
     async function hostStartOnlineGame() {
