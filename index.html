@@ -1131,7 +1131,10 @@
       const cardName = state.player.hand[index];
       const meta = CARD_META[cardName];
 
-      if (state.currentActor === 0) {
+      // オンライン時: 自分のターンかどうかをmyOnlineIndexで判定
+      const isMyTurn = isOnlineMode ? (state.currentActor === myOnlineIndex) : (state.currentActor === 0);
+
+      if (isMyTurn) {
         if (meta.type === 'heal' || meta.type === 'shield' || meta.type === 'buff') {
           playSEForCard(meta.type);
           showActionAnim(meta.type);
@@ -1153,8 +1156,8 @@
         return;
       }
 
-      // 敵ターンカウンター（ローカル・オンライン共通）
-      if (meta.type === 'shield' || meta.type === 'heal') {
+      // 敵ターンカウンター（自分のターンでない時のみ）
+      if (!isMyTurn && (meta.type === 'shield' || meta.type === 'heal')) {
         showActionAnim(meta.type);
         playSEForCard(meta.type);
         const result = useCard(state.player, state.player, cardName);
