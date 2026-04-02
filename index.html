@@ -330,9 +330,28 @@
             <div class="setup-preview" id="setupPreview">プレイヤー 1人 + CPU 2人</div>
           </div>
           <button class="menu-btn" id="startBtn">GAME START</button>
+          <button class="menu-btn" id="multiBtn" style="background:linear-gradient(180deg,#1a3d6a,#0d2244);border-color:#3a7bd5;color:#a8d4ff;">🌐 MULTIPLAYER</button>
           <button class="menu-btn" id="ruleBtn">RULE</button>
           <button class="menu-btn" id="exitBtn">QUIT</button>
         </div>
+
+        <!-- ONLINE LOBBY PANEL -->
+        <div class="rule-panel hidden" id="onlinePanel">
+          <div class="rule-scroll" style="text-align:center;">
+            <h2 style="margin-bottom:16px;color:#3a7bd5;letter-spacing:.1em;">🌐 MULTIPLAYER LOBBY</h2>
+            <div style="display:grid;gap:10px;margin-bottom:12px;">
+              <button class="menu-btn" id="createRoomBtn" style="background:linear-gradient(180deg,#1a5c2a,#0d3a1a);border-color:#3aaa5a;color:#a8ffb8;">🏠 ルーム作成</button>
+              <div style="display:flex;gap:8px;">
+                <input id="roomIdInput" maxlength="8" placeholder="ルームID入力"
+                  style="flex:1;padding:10px;background:#111;border:2px solid #555;color:#f6f0cf;font-size:1rem;text-transform:uppercase;font-family:Inter,sans-serif;" />
+                <button class="menu-btn" id="joinRoomBtn" style="background:linear-gradient(180deg,#1a2c6a,#0d1a44);border-color:#3a5bd5;color:#a8b8ff;">参加</button>
+              </div>
+            </div>
+            <div id="roomStatus" style="font-size:.85rem;color:#a89460;min-height:20px;margin-bottom:8px;"></div>
+            <button class="menu-btn" id="onlineBackBtn" style="margin-top:8px;width:100%;">← タイトルに戻る</button>
+          </div>
+        </div>
+
         <div class="rule-panel hidden" id="rulePanel">
           <div class="rule-scroll">
             <h2>RULE</h2>
@@ -1768,6 +1787,20 @@
     }
 
     // ===== ロビー =====
+    // MULTIPLAYER button
+    document.getElementById('multiBtn').addEventListener('click', () => {
+      SE.click && SE.click();
+      mainMenu.classList.add('hidden');
+      document.getElementById('onlinePanel').classList.remove('hidden');
+      statusBox.textContent = 'オンラインロビー。ルームを作成または参加してください。';
+    });
+    document.getElementById('onlineBackBtn').addEventListener('click', () => {
+      SE.click && SE.click();
+      document.getElementById('onlinePanel').classList.add('hidden');
+      mainMenu.classList.remove('hidden');
+      statusBox.textContent = 'タイトル画面。ここからゲーム本編へつなげる。';
+    });
+
     document.getElementById('createRoomBtn').addEventListener('click', async () => {
       SE.click && SE.click();
       myPlayerId  = 'p_' + Math.random().toString(36).substring(2,8);
