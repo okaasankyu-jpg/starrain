@@ -1985,10 +1985,12 @@
       return {
         player: { hp: state.player.hp, maxHp: state.player.maxHp, shield: state.player.shield,
                   atk: state.player.atk, def: state.player.def, mag: state.player.mag,
-                  alive: state.player.alive, handCount: state.player.hand.length },
+                  alive: state.player.alive, handCount: state.player.hand.length,
+                  _onlineId: state.player._onlineId },
         enemies: state.enemies.map(e => ({
           hp: e.hp, maxHp: e.maxHp, shield: e.shield,
-          atk: e.atk, def: e.def, mag: e.mag, alive: e.alive, handCount: e.hand.length
+          atk: e.atk, def: e.def, mag: e.mag, alive: e.alive, handCount: e.hand.length,
+          _onlineId: e._onlineId
         }))
       };
     }
@@ -2020,18 +2022,28 @@
           if (m.id === myPlayerId) return; // 自分は自分で管理
           const enemy = state.enemies.find(e => e._onlineId === m.id);
           if (enemy) {
-            const src = as.enemies[onlineMemberOrder.indexOf(m) - 1] || as.player;
+            // _onlineIdで相手のデータを探す
+            let src = null;
+            if (as.player?._onlineId === m.id) {
+              src = as.player;
+            } else if (as.enemies) {
+              src = as.enemies.find(e => e._onlineId === m.id);
+            }
             if (src) { enemy.hp = src.hp; enemy.maxHp = src.maxHp;
                        enemy.shield = src.shield; enemy.alive = src.alive; }
           }
         });
-        // 自分がターゲットならHPを更新
-        if (payload.targetIndex !== undefined && payload.targetIndex !== null) {
-          const myEnemySlot = myOnlineIndex - 1;
-          if (payload.targetIndex === myEnemySlot || payload.targetId === 'aoe') {
-            const src = as.enemies[myEnemySlot];
-            if (src) { state.player.hp = src.hp; state.player.maxHp = src.maxHp;
-                       state.player.shield = src.shield; state.player.alive = src.alive; }
+        // 自分がターゲットなら_onlineIdで自分のデータを探してHP更新
+        if (payload.targetId === myPlayerId || payload.targetId === 'aoe') {
+          let src = null;
+          if (as.player?._onlineId === myPlayerId) {
+            src = as.player;
+          } else if (as.enemies) {
+            src = as.enemies.find(e => e._onlineId === myPlayerId);
+          }
+          if (src) {
+            state.player.hp = src.hp; state.player.maxHp = src.maxHp;
+            state.player.shield = src.shield; state.player.alive = src.alive;
           }
         }
       }
