@@ -1856,11 +1856,12 @@
     // ===== オンラインカウンター =====
     function applyOnlineCounter(payload) {
       const idx = onlineMemberOrder.findIndex(m => m.id === payload.actorId);
-      // カウンター発動者のstateを反映
-      if (idx === 0) {
+      // _onlineIdで判定（swap後もズレない）
+      if (payload.actorId === myPlayerId) {
         Object.assign(state.player, payload.playerState);
-      } else if (idx > 0 && state.enemies[idx-1]) {
-        Object.assign(state.enemies[idx-1], payload.playerState);
+      } else {
+        const enemy = state.enemies.find(e => e._onlineId === payload.actorId);
+        if (enemy) Object.assign(enemy, payload.playerState);
       }
       // アニメーション
       const meta = CARD_META[payload.cardName] || {};
@@ -2268,7 +2269,7 @@
     }
 
     function applyOnlineTurnEnd(payload) {
-      onlineCounterPhase = false;
+      // onlineCounterPhaseはATTACK_ANNOUNCEのタイムアウト後にリセット（ここではリセットしない）
       // _onlineIdで判定: 自分以外の状態を更新
       if (payload.actorId !== myPlayerId) {
         if (state.player._onlineId === payload.actorId) {
@@ -2294,6 +2295,8 @@
       renderTop();
       renderHand();
       updateOnlineTurnLock();
+      // 念のため少し後にも再チェック
+      setTimeout(updateOnlineTurnLock, 300);
     }
 
     // バトルフェーズ開始をbroadcast
@@ -2342,6 +2345,7 @@
 
     function checkAllBattleReady() {
       const total = onlineMemberOrder.length;
+      if (total < 2) return; // 1人では開始しない
       if (Object.keys(onlineBattleReadyMap).length < total) return;
 
       // 全員のステータス・手札を適用（_onlineIdで照合）
