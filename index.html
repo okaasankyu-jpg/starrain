@@ -1308,11 +1308,25 @@
 
       state.currentActor = nextActor;
 
-      // オンライン: 次のアクターをbroadcast（自分のターンが終わった直後のみ）
+      // ===== オンライン時: enemyAct()は絶対に呼ばない =====
       if (isOnlineMode && state.phase === 'battle') {
         broadcastTurnEnd();
+        renderTop();
+        renderHand();
+        updateOnlineTurnLock();
+        if (isMyOnlineTurn()) {
+          SE.yourTurn && SE.yourTurn();
+          showAnnounce('🎴 YOUR TURN', '', 1200);
+          addLog('あなたのターン！');
+        } else {
+          const nextName = onlineMemberOrder[state.currentActor]?.nickname || '相手';
+          showAnnounce(`⏳ ${nextName}のターン`, '', 1200);
+          addLog(`${nextName}のターン`);
+        }
+        return; // enemyAct()を呼ばずに必ずここで終了
       }
 
+      // ===== オフライン時のみ =====
       if (state.currentActor === 0) {
         SE.yourTurn(); showAnnounce('🎴 YOUR TURN', '', 1200);
         addLog('PLAYERターン');
@@ -1626,7 +1640,10 @@
         SE.victory && [392,494,587].forEach((f,i)=>playTone(f,'sine',0.15,0.12,i*0.08));
         addLog(`LEVEL UP: LV${state.player.lv-1}→${state.player.lv} (コスト${cost})`);
       } else if (action === 'enhance') {
-        if (!consumePrepareTurn(1)) return;
+        // 7回まで1ターン、以降は2ターン消費
+        const enhCost = (state.player.enhanceCount >= 7) ? 2 : 1;
+        if (!consumePrepareTurn(enhCost)) return;
+        state.player.enhanceCount = (state.player.enhanceCount || 0) + 1;
         const idx = Math.floor(Math.random() * state.player.hand.length);
         const card = state.player.hand[idx];
         const info = findCardInfo(card);
@@ -1635,7 +1652,7 @@
         if (rarityIndex >= 0 && rarityIndex < 6) {
           state.player.hand[idx] = chain[rarityIndex + 1];
           [800,1000,1200].forEach((f,i)=>playTone(f,'sine',0.1,0.09,i*0.06));
-          addLog(`ENHANCE: ${card} → ${chain[rarityIndex + 1]}`);
+          addLog(`ENHANCE: ${card} → ${chain[rarityIndex + 1]} (${state.player.enhanceCount}回目 / コスト${enhCost})`);
         } else {
           addLog(`ENHANCE: ${card} 進化不可`);
         }
@@ -1788,7 +1805,7 @@
       state.battleResolved = false;
       state._dealAnimation = false;
       state.currentActor = 0;
-      state.player = { name:'PLAYER', hp:50, maxHp:50, atk:15, def:15, mag:15, lv:1, turn:20, hand:[], shield:0, atkBuff:0, magBuff:0, alive:true, equipCount:0 };
+      state.player = { name:'PLAYER', hp:50, maxHp:50, atk:15, def:15, mag:15, lv:1, turn:20, hand:[], shield:0, atkBuff:0, magBuff:0, alive:true, equipCount:0, enhanceCount:0 };
       state.enemies = [];
       logHistory = [];
       // UI初期化
@@ -2239,7 +2256,7 @@
       _origNextActor();
     }
 
-    async function broadcastTurnEnd() {
+    async async function broadcastTurnEnd() {
       await sendOnlineEvent({
         type: 'TURN_END',
         actorId: myPlayerId,
@@ -2260,23 +2277,27 @@
 
     function applyOnlineTurnEnd(payload) {
       onlineCounterPhase = false;
-      const idx = onlineMemberOrder.findIndex(m => m.id === payload.actorId);
-      if (idx === 0) {
-        if (myOnlineIndex !== 0) Object.assign(state.player, payload.playerState);
-      } else if (idx > 0 && state.enemies[idx-1]) {
-        if (myOnlineIndex !== idx) Object.assign(state.enemies[idx-1], payload.playerState);
+      // _onlineIdで判定: 自分以外の状態を更新
+      if (payload.actorId !== myPlayerId) {
+        if (state.player._onlineId === payload.actorId) {
+          Object.assign(state.player, payload.playerState);
+        } else {
+          const enemy = state.enemies.find(e => e._onlineId === payload.actorId);
+          if (enemy) Object.assign(enemy, payload.playerState);
+        }
       }
       state.currentActor = payload.currentActor;
-      addLog(`[🌐 ${onlineMemberOrder[idx]?.nickname || '?'}] ターン終了 → 次: P${payload.currentActor + 1}`);
+      const actorName = onlineMemberOrder.find(m => m.id === payload.actorId)?.nickname || '?';
+      addLog(`[🌐 ${actorName}] ターン終了 → 次: ${onlineMemberOrder[payload.currentActor]?.nickname || '?'}`);
 
-      // 自分のターンなら通知
-      if (state.currentActor === myOnlineIndex) {
+      // ターン表示（enemyActは絶対に呼ばない）
+      if (isMyOnlineTurn()) {
         SE.yourTurn && SE.yourTurn();
         showAnnounce('🎴 YOUR TURN', '', 1200);
         addLog('あなたのターン！');
       } else {
         const nextName = onlineMemberOrder[state.currentActor]?.nickname || '相手';
-        showAnnounce(`⏳ ${nextName}のターン`, '', 0);
+        showAnnounce(`⏳ ${nextName}のターン`, '', 1200);
       }
       renderTop();
       renderHand();
