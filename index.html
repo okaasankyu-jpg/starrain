@@ -1301,18 +1301,7 @@
     function nextActor() {
       if (state.battleResolved) {
         finishBattle();
-        
-            // 送信側でもダミー攻撃でターン進行
-            setTimeout(() => {
-              const hpBefore = target.hp;
-              const result = useCard(state.player, target, cardName);
-              addLog(`PLAYER → ${target.name}: ${result} (待機中)`);
-              state.player.hand.splice(cardIndex, 1);
-              renderHand();
-              renderTop();
-              setTimeout(nextActor, 500);
-            }, 5000);
-return;
+        return;
       }
       // 全員初期7枚使い切るまで厳密継続
       const totalPlayers = 1 + state.enemies.length;
