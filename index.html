@@ -2230,7 +2230,7 @@
     }
 
     let onlineCounterPhase = false; // カウンターウィン
-    let onlineTurnSeq = 0; // ターンシーケンス番号（古いTURN_ENDを無視するため）ドウ中フラグ
+    let _lastMyTurnEndTs = 0; // 自分が最後にTURN_ENDを送った時刻ドウ中フラグ
 
     function updateOnlineTurnLock() {
       if (!isOnlineMode) return;
@@ -2268,13 +2268,13 @@
     // nextActor()に直接組み込み済み（旧hookシステム削除）
 
     async function broadcastTurnEnd() {
-      onlineTurnSeq++;
+      _lastMyTurnEndTs = Date.now();
       await sendOnlineEvent({
         type: 'TURN_END',
         actorId: myPlayerId,
         playerState: serializeMyState(),
         currentActor: state.currentActor,
-        seq: onlineTurnSeq,
+        ts: _lastMyTurnEndTs,
       });
     }
 
@@ -2289,13 +2289,12 @@
     }
 
     function applyOnlineTurnEnd(payload) {
-      // 古いTURN_ENDは無視（カウンター後の競合対策）
-      if (payload.seq !== undefined && payload.seq <= onlineTurnSeq) {
-        addLog(`[🌐 古いTURN_END無視 seq:${payload.seq}/${onlineTurnSeq}]`);
-        return;
+      // カウンター中は相手からのTURN_ENDを無視
+      if (onlineCounterPhase) return;
+      // 自分が直近でbroadcastした場合(500ms以内)は相手のTURN_ENDを無視
+      if (payload.ts && _lastMyTurnEndTs && payload.actorId !== myPlayerId) {
+        if (payload.ts < _lastMyTurnEndTs) return;
       }
-      if (payload.seq !== undefined) onlineTurnSeq = payload.seq;
-      // onlineCounterPhaseはATTACK_ANNOUNCEのタイムアウト後にリセット（ここではリセットしない）
       // _onlineIdで判定: 自分以外の状態を更新
       if (payload.actorId !== myPlayerId) {
         if (state.player._onlineId === payload.actorId) {
@@ -2396,7 +2395,6 @@
       });
 
       onlineBattleReadyMap = {}; // リセット
-      onlineTurnSeq = 0; // シーケンスリセット
       clearAnnounce();
       _origStartBattle();
     }
