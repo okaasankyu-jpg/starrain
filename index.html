@@ -2229,7 +2229,8 @@
       return onlineMemberOrder[state.currentActor]?.id || null;
     }
 
-    let onlineCounterPhase = false; // カウンターウィンドウ中フラグ
+    let onlineCounterPhase = false; // カウンターウィン
+    let onlineTurnSeq = 0; // ターンシーケンス番号（古いTURN_ENDを無視するため）ドウ中フラグ
 
     function updateOnlineTurnLock() {
       if (!isOnlineMode) return;
@@ -2267,11 +2268,13 @@
     // nextActor()に直接組み込み済み（旧hookシステム削除）
 
     async function broadcastTurnEnd() {
+      onlineTurnSeq++;
       await sendOnlineEvent({
         type: 'TURN_END',
         actorId: myPlayerId,
         playerState: serializeMyState(),
         currentActor: state.currentActor,
+        seq: onlineTurnSeq,
       });
     }
 
@@ -2286,6 +2289,12 @@
     }
 
     function applyOnlineTurnEnd(payload) {
+      // 古いTURN_ENDは無視（カウンター後の競合対策）
+      if (payload.seq !== undefined && payload.seq <= onlineTurnSeq) {
+        addLog(`[🌐 古いTURN_END無視 seq:${payload.seq}/${onlineTurnSeq}]`);
+        return;
+      }
+      if (payload.seq !== undefined) onlineTurnSeq = payload.seq;
       // onlineCounterPhaseはATTACK_ANNOUNCEのタイムアウト後にリセット（ここではリセットしない）
       // _onlineIdで判定: 自分以外の状態を更新
       if (payload.actorId !== myPlayerId) {
@@ -2387,6 +2396,7 @@
       });
 
       onlineBattleReadyMap = {}; // リセット
+      onlineTurnSeq = 0; // シーケンスリセット
       clearAnnounce();
       _origStartBattle();
     }
