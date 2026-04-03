@@ -1178,8 +1178,20 @@
             result,
             playerState: serializeMyState(),
           });
+          // カウンターはターン消費しない → カウンターした側のターンにする
+          onlineCounterPhase = false;
+          const myIdx = onlineMemberOrder.findIndex(m => m.id === myPlayerId);
+          state.currentActor = myIdx;
+          broadcastTurnEnd();
+          renderHand();
+          updateOnlineTurnLock();
+          SE.yourTurn && SE.yourTurn();
+          showAnnounce('🎴 YOUR TURN', 'カウンター成功！', 1500);
+          addLog('カウンター成功！あなたのターン！');
+        } else {
+          // オフライン: そのままターン進める（CPU相手はカウンター後もCPUターン継続）
+          pendingEnemyAdvance = setTimeout(() => nextActor(), 250);
         }
-        pendingEnemyAdvance = setTimeout(() => nextActor(), 250);
       }
     }
 
