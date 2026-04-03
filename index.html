@@ -1256,7 +1256,8 @@
               targetIndex, cardName, predicted });
             if (pendingEnemyAdvance) { clearTimeout(pendingEnemyAdvance); pendingEnemyAdvance = null; }
             showAnnounce(`⚔️ ${cardName}`, `カウンター待機中... (5s)`, 5000);
-            setTimeout(() => {
+            setTimeout(() => {useCard(state.player,target,cardName);state.player.hand.splice(cardIndex,1);renderHand();renderTop();setTimeout(nextActor,500);},5000);
+return;
               const hpBefore = target.hp;
               const result = useCard(state.player, target, cardName);
               const dmgDealt = Math.max(0, hpBefore - target.hp);
