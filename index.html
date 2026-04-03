@@ -1149,7 +1149,7 @@
           renderTop();
           if (isOnlineMode) sendOnlineEvent({ type: 'CARD_ACTION', actorId: myPlayerId,
             cardName, targetId: null, result, playerState: serializeMyState(), allState: serializeAllState() });
-          setTimeout(nextActor, 500);
+          if (!isOnlineMode) setTimeout(nextActor, 500);;
         } else {
           showTargetSelector(index);
           // nextActorはtarget選択後に呼ばれる
@@ -1190,8 +1190,8 @@
           broadcastTurnEnd();
           renderHand();
           updateOnlineTurnLock();
-          SE.yourTurn && SE.yourTurn();
-          showAnnounce('🎴 YOUR TURN', 'カウンター成功！', 1500);
+          // YOUR TURNアナウンスはapplyOnlineTurnEndで統一
+          addLog('カウンター成功！あなたのターン！');
           addLog('カウンター成功！あなたのターン！');
         } else {
           // オフライン: そのままターン進める（CPU相手はカウンター後もCPUターン継続）
@@ -1218,7 +1218,7 @@
         renderTop();
         if (isOnlineMode) sendOnlineEvent({ type: 'CARD_ACTION', actorId: myPlayerId,
           cardName, targetId: 'aoe', result, playerState: serializeMyState(), allState: serializeAllState() });
-        setTimeout(nextActor, 600);
+        if (!isOnlineMode) setTimeout(nextActor, 600);;
         return;
       }
 
@@ -1274,7 +1274,7 @@
                 cardName, targetIndex,
                 targetId: state.enemies[targetIndex]?._onlineId || null,
                 result, playerState: serializeMyState(), allState: serializeAllState() });
-              setTimeout(nextActor, 500);
+              if (!isOnlineMode) setTimeout(nextActor, 500);;
             }, 5000);
           } else {
             // ローカル: 即時実行
@@ -1292,7 +1292,7 @@
             }
             clearAnnounce();
             renderHand(); renderTop();
-            setTimeout(nextActor, 500);
+            if (!isOnlineMode) setTimeout(nextActor, 500);;
           }
         };
       });
@@ -1332,9 +1332,6 @@
         const totalOnline = onlineMemberOrder.length;
         state.currentActor = (state.currentActor) % totalOnline;
         broadcastTurnEnd();
-        renderTop();
-        renderHand();
-        updateOnlineTurnLock();
         if (isMyOnlineTurn()) {
           SE.yourTurn && SE.yourTurn();
           showAnnounce('🎴 YOUR TURN', '', 1200);
@@ -2327,7 +2324,12 @@
       renderHand();
       updateOnlineTurnLock();
       // 念のため少し後にも再チェック
-      setTimeout(updateOnlineTurnLock, 300);
+      setTimeout(() => {
+        updateOnlineTurnLock();
+        if (isMyOnlineTurn() && !onlineCounterPhase) {
+          showAnnounce('🎴 YOUR TURN', '', 1200);
+        }
+      }, 300);
     }
 
     // バトルフェーズ開始をbroadcast
