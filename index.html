@@ -1962,12 +1962,14 @@
         config: { broadcast: { self: false }, presence: { key: myPlayerId } }
       });
 
-      // プレゼンス同期
-      onlineChannel.on('presence', { event: 'sync' }, () => {
+      // プレゼンス同期（sync + join + leave すべてで更新）
+      const updateLobby = () => {
         const members = Object.values(onlineChannel.presenceState()).flat();
-        setRoomStatus(`ルーム: ${roomId}  参加者: ${members.length}人`, '#55efc4');
         renderOnlineLobby(members);
-      });
+      };
+      onlineChannel.on('presence', { event: 'sync' }, updateLobby);
+      onlineChannel.on('presence', { event: 'join' }, updateLobby);
+      onlineChannel.on('presence', { event: 'leave' }, updateLobby);
 
       // ゲームイベント受信
       onlineChannel.on('broadcast', { event: 'online_game' }, ({ payload }) => {
