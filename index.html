@@ -298,8 +298,8 @@
   </style>
   
   <script>
-    // const SUPABASE_URL = 'https://dsvxpxuujnqnqgdtwnub.supabase.co';
-    // const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRzdnhweHV1am5xbnFnZHR3bnViIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxMjM0NTUsImV4cCI6MjA5MDY5OTQ1NX0.9pJNvI7gps-vnIWOtsuEJCh6AI6ZKftMfE_kcGi-qaE';
+    const SUPABASE_URL = 'https://dsvxpxuujnqnqgdtwnub.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRzdnhweHV1am5xbnFnZHR3bnViIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxMjM0NTUsImV4cCI6MjA5MDY5OTQ1NX0.9pJNvI7gps-vnIWOtsuEJCh6AI6ZKftMfE_kcGi-qaE';
     // const sbClient =(SUPABASE_URL, SUPABASE_KEY);
   </script>
 </head>
@@ -1789,7 +1789,7 @@
       if (isOnlineMode) {
         try { if (onlineChannel) await sbClient.removeChannel(onlineChannel); } catch(e) {}
         onlineChannel = null;
-        isOnlineMode = false;
+        isOnlineMode = true;
         onlineRoom = null;
         myPlayerId = null;
         isRoomHost = false;
@@ -2191,7 +2191,7 @@
     // ===== ゲーム起動 =====
     function launchOnlineGame(order) {
       if (isOnlineMode) return; // 二重起動防止
-      isOnlineMode = false;
+      isOnlineMode = true;
       onlineMemberOrder = order;
 
       // 自分のインデックス特定
