@@ -1179,6 +1179,11 @@
             playerState: serializeMyState(),
           });
           // カウンターはターン消費しない → カウンターした側のターンにする
+          // ここで残っている自動進行タイマーを完全停止
+          if (pendingEnemyAdvance) {
+            clearTimeout(pendingEnemyAdvance);
+            pendingEnemyAdvance = null;
+          }
           onlineCounterPhase = false;
           const myIdx = onlineMemberOrder.findIndex(m => m.id === myPlayerId);
           state.currentActor = myIdx;
@@ -1249,6 +1254,7 @@
             const predicted = `${cardName} → 約${Math.floor((meta.power||6) + state.player.atk * 0.5)}ダメージ`;
             sendOnlineEvent({ type: 'ATTACK_ANNOUNCE', actorId: myPlayerId, targetId: targetOnlineId,
               targetIndex, cardName, predicted });
+            if (pendingEnemyAdvance) { clearTimeout(pendingEnemyAdvance); pendingEnemyAdvance = null; }
             showAnnounce(`⚔️ ${cardName}`, `カウンター待機中... (5s)`, 5000);
             setTimeout(() => {
               const hpBefore = target.hp;
