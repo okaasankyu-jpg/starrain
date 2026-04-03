@@ -1255,8 +1255,54 @@
             sendOnlineEvent({ type: 'ATTACK_ANNOUNCE', actorId: myPlayerId, targetId: targetOnlineId,
               targetIndex, cardName, predicted });
             if (pendingEnemyAdvance) { clearTimeout(pendingEnemyAdvance); pendingEnemyAdvance = null; }
-                        showAnnounce(`⚔️ ${cardName}`, `カウンター待機中... (5s)`, 5000);
-            // 送信側でもダミー攻撃でターン進行（受信側で実ダメージ再計算）
+            showAnnounce(`⚔️ ${cardName}`, `カウンター待機中... (5s)`, 5000);
+            setTimeout(() => {
+              const hpBefore = target.hp;
+              const result = useCard(state.player, target, cardName);
+              const dmgDealt = Math.max(0, hpBefore - target.hp);
+              playSEForCard(meta.type || 'physical');
+              showActionAnim(meta.type || 'physical');
+              state.player.hand.splice(cardIndex, 1);
+              addLog(`PLAYER → ${target.name}: ${result}`);
+              const targetEl = document.getElementById('enemyCard' + targetIndex);
+              if (targetEl) {
+                if (dmgDealt > 0) { showDamagePopup(targetEl, dmgDealt, meta.type); hitEnemyCard(targetIndex); shakeScreen(); }
+                else if (meta.type === 'debuff') showDamagePopup(targetEl, result.match(/\d+/)?.[0]||'', 'debuff');
+              }
+              renderHand(); renderTop();
+              sendOnlineEvent({ type: 'CARD_ACTION', actorId: myPlayerId,
+                cardName, targetIndex,
+                targetId: state.enemies[targetIndex]?._onlineId || null,
+                result, playerState: serializeMyState(), allState: serializeAllState() });
+              if (!isOnlineMode) setTimeout(nextActor, 500);;
+            }, 5000);
+          } else {
+            // ローカル: 即時実行
+            const hpBefore = target.hp;
+            const result = useCard(state.player, target, cardName);
+            const dmgDealt = Math.max(0, hpBefore - target.hp);
+            playSEForCard(meta.type || 'physical');
+            showActionAnim(meta.type || 'physical');
+            state.player.hand.splice(cardIndex, 1);
+            addLog(`PLAYER → ${target.name}: ${result}`);
+            const targetEl = document.getElementById('enemyCard' + targetIndex);
+            if (targetEl) {
+              if (dmgDealt > 0) { showDamagePopup(targetEl, dmgDealt, meta.type); hitEnemyCard(targetIndex); shakeScreen(); }
+              else if (meta.type === 'debuff') showDamagePopup(targetEl, result.match(/\d+/)?.[0]||'', 'debuff');
+            }
+            clearAnnounce();
+            renderHand(); renderTop();
+            if (!isOnlineMode) setTimeout(nextActor, 500);;
+          }
+        };
+      });
+    }
+
+    function nextActor() {
+      if (state.battleResolved) {
+        finishBattle();
+        
+            // 送信側でもダミー攻撃でターン進行
             setTimeout(() => {
               const hpBefore = target.hp;
               const result = useCard(state.player, target, cardName);
@@ -1266,7 +1312,7 @@
               renderTop();
               setTimeout(nextActor, 500);
             }, 5000);
-            return;
+return;
       }
       // 全員初期7枚使い切るまで厳密継続
       const totalPlayers = 1 + state.enemies.length;
