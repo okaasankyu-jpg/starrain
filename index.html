@@ -1254,17 +1254,18 @@
             const predicted = `${cardName} → 約${Math.floor((meta.power||6) + state.player.atk * 0.5)}ダメージ`;
             sendOnlineEvent({ type: 'ATTACK_ANNOUNCE', actorId: myPlayerId, targetId: targetOnlineId,
               targetIndex, cardName, predicted });
-            if (pendingEnemyAdvance) { clearTimeout(pendingEnemyAdvance); pendingEnemyAdvance = null; }
-            showAnnounce(`⚔️ ${cardName}`, `カウンター待機中... (5s)`, 5000);
+            if (            showAnnounce(`⚔️ ${cardName}`, `カウンター待機中... (5s)`, 5000);
+            // 送信側でもダミー攻撃でターン進行
             setTimeout(() => {
               const hpBefore = target.hp;
               const result = useCard(state.player, target, cardName);
-              const dmgDealt = Math.max(0, hpBefore - target.hp);
-              playSEForCard(meta.type || 'physical');
-              showActionAnim(meta.type || 'physical');
+              addLog(`PLAYER → ${target.name}: ${result} (待機中)`);
               state.player.hand.splice(cardIndex, 1);
-              addLog(`PLAYER → ${target.name}: ${result}`);
-              const targetEl = document.getElementById('enemyCard' + targetIndex);
+              renderHand();
+              renderTop();
+              setTimeout(nextActor, 500);
+            }, 5000);
+            return;    const targetEl = document.getElementById('enemyCard' + targetIndex);
               if (targetEl) {
                 if (dmgDealt > 0) { showDamagePopup(targetEl, dmgDealt, meta.type); hitEnemyCard(targetIndex); shakeScreen(); }
                 else if (meta.type === 'debuff') showDamagePopup(targetEl, result.match(/\d+/)?.[0]||'', 'debuff');
