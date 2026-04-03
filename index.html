@@ -2256,7 +2256,7 @@
       _origNextActor();
     }
 
-    async async function broadcastTurnEnd() {
+    async function broadcastTurnEnd() {
       await sendOnlineEvent({
         type: 'TURN_END',
         actorId: myPlayerId,
