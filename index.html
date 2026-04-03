@@ -2246,15 +2246,7 @@
     }
 
     // ===== カードアクション送信 =====
-    // onHandCardClickとshowTargetSelectorの後にhookして送信
-    const _origNextActor = nextActor;
-    function nextActorOnline() {
-      if (isOnlineMode) {
-        // 自分のアクションが終わったらstate差分をbroadcast
-        broadcastTurnEnd();
-      }
-      _origNextActor();
-    }
+    // nextActor()に直接組み込み済み（旧hookシステム削除）
 
     async function broadcastTurnEnd() {
       await sendOnlineEvent({
@@ -2402,23 +2394,7 @@
     window.renderHand  = renderHandOnline;
 
     // タイトルに戻る時はオンラインモードリセット
-    const _titleBackOrig = document.getElementById('titleBackBtn').onclick;
-    document.getElementById('titleBackBtn').addEventListener('click', async () => {
-      if (isOnlineMode && onlineChannel) {
-        await sbClient.removeChannel(onlineChannel);
-        onlineChannel = null;
-      }
-      isOnlineMode         = false;
-      onlineRoom           = null;
-      myPlayerId           = null;
-      isRoomHost           = false;
-      onlineMemberOrder    = [];
-      setRoomStatus('');
-      const lobby = document.getElementById('onlineLobby');
-      if (lobby) lobby.remove();
-      const sb = document.getElementById('onlineStartBtn');
-      if (sb) sb.remove();
-    });
+    const _titleBackOrig = document.getElementById('titleBackBtn').onclick;;
 
   </script>
 </body>
