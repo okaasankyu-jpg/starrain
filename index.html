@@ -2388,13 +2388,13 @@
     }
 
     // 関数の差し替え（グローバル上書き）
-    window.nextActor   = nextActorOnline;
+    // nextActorは既にオンライン対応済みなので差し替え不要
+    // window.nextActor = nextActorOnline; ← 削除
     window.startBattle = startBattleOnline;
     window.enemyAct    = enemyActOnline;
     window.renderHand  = renderHandOnline;
 
-    // タイトルに戻る時はオンラインモードリセット
-    const _titleBackOrig = document.getElementById('titleBackBtn').onclick;;
+    // タイトルに戻る処理はtitleBackBtnのlistenerに統合済み
 
   </script>
 </body>
