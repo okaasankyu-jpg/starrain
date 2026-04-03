@@ -1310,6 +1310,9 @@
 
       // ===== オンライン時: enemyAct()は絶対に呼ばない =====
       if (isOnlineMode && state.phase === 'battle') {
+        // オンラインでは手札枚数でスキップせず、単純に順番を回す
+        const totalOnline = onlineMemberOrder.length;
+        state.currentActor = (state.currentActor) % totalOnline;
         broadcastTurnEnd();
         renderTop();
         renderHand();
