@@ -1899,12 +1899,19 @@
 
       // 自分がターゲットならカウンターウィンドウを開く
       if (payload.targetId === myPlayerId) {
+        // 攻撃を保留
+        onlineAttackPending = { actorId: payload.actorId, cardName: payload.cardName, targetId: payload.targetId };
         onlineCounterPhase = true;
         renderHand();
         updateOnlineTurnLock();
-        // 2.8秒後に自動でカウンターウィンドウ閉じる
+        // 5秒後にカウンターウィンドウ閉じて攻撃実行
         setTimeout(() => {
           onlineCounterPhase = false;
+          // 保留攻撃を実行（カウンターがあればシールド反映済み）
+          if (onlineAttackPending) {
+            executePendingAttack(onlineAttackPending);
+            onlineAttackPending = null;
+          }
           updateOnlineTurnLock();
         }, 5000);
       }
@@ -2124,6 +2131,29 @@
       renderHand();
     }
 
+    function executePendingAttack(pending) {
+      const { actorId, cardName, targetIndex } = pending;
+      const target = state.enemies[targetIndex];
+      if (!target) return;
+
+      const hpBefore = target.hp;
+      const result = useCard(state.player, target, cardName);
+      const dmgDealt = Math.max(0, hpBefore - target.hp);
+      playSEForCard('physical');
+      showActionAnim('physical');
+      addLog(`[🌐 ${onlineMemberOrder.find(m => m.id === actorId)?.nickname || '?'}] → ${result}`);
+      const targetEl = document.getElementById('enemyCard' + targetIndex);
+      if (targetEl && dmgDealt > 0) {
+        showDamagePopup(targetEl, dmgDealt, 'physical');
+        hitEnemyCard(targetIndex);
+        shakeScreen();
+      }
+      renderTop();
+      renderHand();
+      sendOnlineEvent({ type: 'CARD_ACTION', actorId, cardName, targetIndex, result, playerState: serializeMyState(), allState: serializeAllState() });
+      setTimeout(nextActor, 500);
+    }
+    
     function handleOnlineEvent(payload) {
       switch (payload.type) {
         case 'START':
@@ -2233,7 +2263,8 @@
     }
 
     let onlineCounterPhase = false; // カウンターウィン
-    let _lastMyTurnEndTs = 0; // 自分が最後にTURN_ENDを送った時刻ドウ中フラグ
+    let _lastMyTurnEndTs = 0; // 自分が最後にTURN_ENDを送った時刻
+    let onlineAttackPending = null; // {actorId, cardName, targetId, targetIndex}ドウ中フラグ
 
     function updateOnlineTurnLock() {
       if (!isOnlineMode) return;
