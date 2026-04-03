@@ -296,11 +296,11 @@
     @keyframes pulse { 0%,100%{ opacity: 1; } 50%{ opacity: 0.85; } }
     .enemy-highlight { outline: 4px solid #ffaa00 !important; box-shadow: 0 0 24px rgba(255,170,0,0.8) !important; }
   </style>
-  
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
-    // const SUPABASE_URL = 'https://dsvxpxuujnqnqgdtwnub.supabase.co';
-    // const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRzdnhweHV1am5xbnFnZHR3bnViIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxMjM0NTUsImV4cCI6MjA5MDY5OTQ1NX0.9pJNvI7gps-vnIWOtsuEJCh6AI6ZKftMfE_kcGi-qaE';
-    // const sbClient =(SUPABASE_URL, SUPABASE_KEY);
+    const SUPABASE_URL = 'https://dsvxpxuujnqnqgdtwnub.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRzdnhweHV1am5xbnFnZHR3bnViIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxMjM0NTUsImV4cCI6MjA5MDY5OTQ1NX0.9pJNvI7gps-vnIWOtsuEJCh6AI6ZKftMfE_kcGi-qaE';
+    const sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   </script>
 </head>
 <body>
@@ -1899,19 +1899,12 @@
 
       // 自分がターゲットならカウンターウィンドウを開く
       if (payload.targetId === myPlayerId) {
-        // 攻撃を保留
-        onlineAttackPending = { actorId: payload.actorId, cardName: payload.cardName, targetId: payload.targetId };
         onlineCounterPhase = true;
         renderHand();
         updateOnlineTurnLock();
-        // 5秒後にカウンターウィンドウ閉じて攻撃実行
+        // 2.8秒後に自動でカウンターウィンドウ閉じる
         setTimeout(() => {
           onlineCounterPhase = false;
-          // 保留攻撃を実行（カウンターがあればシールド反映済み）
-          if (onlineAttackPending) {
-            executePendingAttack(onlineAttackPending);
-            onlineAttackPending = null;
-          }
           updateOnlineTurnLock();
         }, 5000);
       }
@@ -2131,29 +2124,6 @@
       renderHand();
     }
 
-    function executePendingAttack(pending) {
-      const { actorId, cardName, targetIndex } = pending;
-      const target = state.enemies[targetIndex];
-      if (!target) return;
-
-      const hpBefore = target.hp;
-      const result = useCard(state.player, target, cardName);
-      const dmgDealt = Math.max(0, hpBefore - target.hp);
-      playSEForCard('physical');
-      showActionAnim('physical');
-      addLog(`[🌐 ${onlineMemberOrder.find(m => m.id === actorId)?.nickname || '?'}] → ${result}`);
-      const targetEl = document.getElementById('enemyCard' + targetIndex);
-      if (targetEl && dmgDealt > 0) {
-        showDamagePopup(targetEl, dmgDealt, 'physical');
-        hitEnemyCard(targetIndex);
-        shakeScreen();
-      }
-      renderTop();
-      renderHand();
-      sendOnlineEvent({ type: 'CARD_ACTION', actorId, cardName, targetIndex, result, playerState: serializeMyState(), allState: serializeAllState() });
-      setTimeout(nextActor, 500);
-    }
-    
     function handleOnlineEvent(payload) {
       switch (payload.type) {
         case 'START':
@@ -2191,7 +2161,7 @@
     // ===== ゲーム起動 =====
     function launchOnlineGame(order) {
       if (isOnlineMode) return; // 二重起動防止
-      isOnlineMode = false;
+      isOnlineMode = true;
       onlineMemberOrder = order;
 
       // 自分のインデックス特定
@@ -2263,8 +2233,7 @@
     }
 
     let onlineCounterPhase = false; // カウンターウィン
-    let _lastMyTurnEndTs = 0; // 自分が最後にTURN_ENDを送った時刻
-    let onlineAttackPending = null; // {actorId, cardName, targetId, targetIndex}ドウ中フラグ
+    let _lastMyTurnEndTs = 0; // 自分が最後にTURN_ENDを送った時刻ドウ中フラグ
 
     function updateOnlineTurnLock() {
       if (!isOnlineMode) return;
@@ -2466,36 +2435,4 @@
 
   </script>
 </body>
-</html<script>
-document.addEventListener("DOMContentLoaded", function() {
-  console.log("STARRAIN タイトル初期化完了");
-
-  // 名前確定
-  document.getElementById("confirmNameBtn").onclick = function() {
-    playerNickname = document.getElementById("nicknameInput").value || "PLAYER";
-    document.getElementById("confirmedNameDisplay").textContent = `名前: ${playerNickname}`;
-    SE.click();
-  };
-
-  // CPU数選択
-  document.querySelectorAll(".count-btn").forEach(btn => {
-    btn.onclick = () => {
-      document.querySelectorAll(".count-btn").forEach(b => b.classList.remove("active"));
-      btn.classList.add("active");
-      selectedPlayerCount = parseInt(btn.dataset.count);
-      document.getElementById("setupPreview").textContent = `プレイヤー 1人 + CPU ${selectedPlayerCount-1}人`;
-      SE.click();
-    };
-  });
-
-  // GAME START
-  document.getElementById("startBtn").onclick = function() {
-    playerNameEl.textContent = playerNickname;
-    titleView.classList.add("hidden");
-    gameView.classList.remove("hidden");
-    initGame();
-    SE.battleStart();
-  };
-});
-</script>
->
+</html>
